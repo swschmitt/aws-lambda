@@ -9,7 +9,7 @@ import collections
 import pickle
 import tempfile
 
-TIMEOUT = 1800
+TIMEOUT = 300
 
 def log(message):
     print datetime.datetime.now().isoformat() + ' | ' + str(message)
@@ -47,7 +47,8 @@ def lambda_handler(event={}, context={}):
     processed_end_time = response['Item'].get('end_time', 0)
     processed_bucket = response['Item']['s3bucket']
 
-    if processed_date == latest_date:
+    # Cancel if same day or within an hour of data collection
+    if (latest_date == processed_date) or (latest_end_time - processed_end_time < 60*60):
         log("Data processing is caught up, exiting.")
         return
 
@@ -166,7 +167,10 @@ def lambda_handler(event={}, context={}):
                     if ability < ability2:
                         add_loss('synergy', (ability, ability2))
 
+            processed_end_time = match['start_time'] + match['duration']
+
         # end for match in response
+
 
         if 'LastEvaluatedKey' in response:
             log(str(response['Count']) + " : " + str(response['LastEvaluatedKey']))
@@ -203,7 +207,7 @@ def lambda_handler(event={}, context={}):
         Item={
             'role': 'processed',
             'match_seq_num': process_seq_num,
-            # 'end_time': processed_end_time,
+            'end_time': processed_end_time,
             'date': str(processed_date),
             's3bucket': processed_bucket
         }

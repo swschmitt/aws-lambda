@@ -28,7 +28,7 @@ def lambda_handler(event={}, context={}):
     latest_seq_num = response['Item']['match_seq_num']
     latest_date = response['Item'].get('date', "")
     latest_end_time = response['Item'].get('end_time', 0)
-    
+
     response = metadata_table.get_item(
         Key={
             'role': 'dota_api_key'
