@@ -5,10 +5,11 @@ import json
 import time
 import urllib2
 import datetime
+from itertools import cycle
 
 API_URL = "https://api.steampowered.com/IDOTA2Match_570"
 TIMEOUT = 290
-EARLY_TIMEOUT = TIMEOUT - 30
+EARLY_TIMEOUT = TIMEOUT - 0
 
 def log(message):
     print datetime.datetime.now().isoformat() + ' | ' + str(message)
@@ -36,8 +37,10 @@ def lambda_handler(event={}, context={}):
     )
     # dota_api_key = response['Item']['dota_api_key']
     dota_api_keys = response['Item']['dota_api_keys']
+    key_iter = cycle(dota_api_keys)
 
-    log("Starting at seq num " + str(latest_seq_num))
+    timediff=start_time-float(latest_end_time)
+    log("Starting at seq num " + str(latest_seq_num) + ", behind " + str(datetime.timedelta(seconds=timediff)))
 
     total_matches = 0
     total_ad_matches = 0
@@ -68,7 +71,8 @@ def lambda_handler(event={}, context={}):
             if timed_out:
                 break
 
-            for dota_api_key in dota_api_keys:
+            for _ in range(len(dota_api_keys)):
+                dota_api_key = next(key_iter)
                 url = (API_URL + "/GetMatchHistoryBySequenceNum/V001/?key=" + dota_api_key +
                        "&start_at_match_seq_num=" + str(latest_seq_num) + "&matches_requested=1000")
 
@@ -78,6 +82,7 @@ def lambda_handler(event={}, context={}):
                     if status == 1:
                         break
                 except Exception:
+                    # log("Try next API key at seq num " + str(latest_seq_num))
                     pass
 
             api_call_time = time.time()

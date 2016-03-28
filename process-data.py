@@ -9,7 +9,7 @@ import collections
 import pickle
 import tempfile
 
-TIMEOUT = 300
+TIMEOUT = 240
 
 def log(message):
     print datetime.datetime.now().isoformat() + ' | ' + str(message)
@@ -47,28 +47,28 @@ def lambda_handler(event={}, context={}):
     processed_end_time = response['Item'].get('end_time', 0)
     processed_bucket = response['Item']['s3bucket']
 
-    # Cancel if same day or within an hour of data collection
-    if (latest_date == processed_date) or (latest_end_time - processed_end_time < 60*60):
+    # Cancel if within 3 hours of data collection
+    if latest_end_time - processed_end_time < 3*60*60:
         log("Data processing is caught up, exiting.")
         return
 
     log("Starting at " + str(processed_date) + " Timestamp " + str(processed_end_time))
 
-    # Counters (total, wins)
+    # Counters {total, wins}
     counters = dict()
-    counters['single'] = (collections.Counter(), collections.Counter())
-    counters['hero'] = (collections.Counter(), collections.Counter())
-    counters['combo'] = (collections.Counter(), collections.Counter())
-    counters['counter'] = (collections.Counter(), collections.Counter())
-    counters['synergy'] = (collections.Counter(), collections.Counter())
-    counters['item'] = (collections.Counter(), collections.Counter())
+    counters['single']  = {'total': collections.Counter(), 'wins': collections.Counter()}
+    counters['hero']    = {'total': collections.Counter(), 'wins': collections.Counter()}
+    counters['combo']   = {'total': collections.Counter(), 'wins': collections.Counter()}
+    counters['counter'] = {'total': collections.Counter(), 'wins': collections.Counter()}
+    counters['synergy'] = {'total': collections.Counter(), 'wins': collections.Counter()}
+    counters['item']    = {'total': collections.Counter(), 'wins': collections.Counter()}
 
     def add_win(table, key):
-        counters[table][0][key] += 1
-        counters[table][1][key] += 1
+        counters[table]['total'][key] += 1
+        counters[table]['wins'][key] += 1
 
     def add_loss(table, key):
-        counters[table][0][key] += 1
+        counters[table]['total'][key] += 1
 
     while True:
 
@@ -176,6 +176,7 @@ def lambda_handler(event={}, context={}):
             log(str(response['Count']) + " : " + str(response['LastEvaluatedKey']))
             process_seq_num = response['LastEvaluatedKey']['match_seq_num']
         else:
+            log(str(response['Count']))
             break
 
         # Timeout?
@@ -185,10 +186,10 @@ def lambda_handler(event={}, context={}):
 
     # end while True
 
-    # Generate files
-    tempfile.mkstemp()
+    # Generate file
     tmp = tempfile.NamedTemporaryFile(delete=False)
-    pickle.dump(counters, tmp)
+    pickle.dump(counters, tmp, 2)
+    tmp.close()
     log(tmp.name)
 
     # Upload to S3
@@ -198,7 +199,7 @@ def lambda_handler(event={}, context={}):
     log(s3_obj)
 
     # Completed the day
-    if not timed_out:
+    if (not timed_out) and (latest_date != processed_date):
         processed_date += datetime.timedelta(days=1)
         process_seq_num = 0
 
@@ -214,4 +215,6 @@ def lambda_handler(event={}, context={}):
     )
 
 if __name__ == '__main__':
+    log('Enter')
     lambda_handler()
+    log('Exit')
