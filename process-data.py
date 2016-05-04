@@ -1,18 +1,37 @@
 #!/usr/bin/python
 
 import boto3
-import json
 import time
 import datetime
 from boto3.dynamodb.conditions import Key, Attr
 import collections
-import pickle
 import tempfile
 
 TIMEOUT = 240
 
+TABLES = {
+    'single'  : { 'csv_header': 'ability'                  },
+    'hero'    : { 'csv_header': 'hero,ability'             },
+    'combo'   : { 'csv_header': 'ability1,ability2'        },
+    'counter' : { 'csv_header': 'ability_win,ability_lose' },
+    'synergy' : { 'csv_header': 'ability1,ability2'        },
+    'item'    : { 'csv_header': 'ability,item'             },
+}
+
 def log(message):
     print datetime.datetime.now().isoformat() + ' | ' + str(message)
+
+def write_csv(table, header, out_file):
+    def stringify_key(key):
+        if type(key) == tuple:
+            return ','.join(map(str, key))
+        else:
+            return str(key)
+
+    with open(out_file, 'w') as fd:
+        fd.write(header + ',total,wins\n')
+        for key in table['total']:
+            fd.write(stringify_key(key) + ',' + str(table['total'][key]) + ',' + str(table['wins'][key]) + '\n')
 
 def lambda_handler(event={}, context={}):
     start_time = time.time()
@@ -30,7 +49,7 @@ def lambda_handler(event={}, context={}):
         }
     )
     latest_seq_num = response['Item']['match_seq_num']
-    latest_date = response['Item'].get('date', "")
+    latest_date = response['Item'].get('date')
     latest_date = datetime.datetime.strptime(latest_date, '%Y-%m-%d').date()
     latest_end_time = response['Item'].get('end_time', 0)
 
@@ -42,7 +61,7 @@ def lambda_handler(event={}, context={}):
     )
     processed_seq_num = response['Item'].get('match_seq_num', 0)
     process_seq_num = processed_seq_num
-    processed_date = response['Item'].get('date', "")
+    processed_date = response['Item'].get('date')
     processed_date = datetime.datetime.strptime(processed_date, '%Y-%m-%d').date()
     processed_end_time = response['Item'].get('end_time', 0)
     processed_bucket = response['Item']['s3bucket']
@@ -186,17 +205,19 @@ def lambda_handler(event={}, context={}):
 
     # end while True
 
-    # Generate file
-    tmp = tempfile.NamedTemporaryFile(delete=False)
-    pickle.dump(counters, tmp, 2)
-    tmp.close()
-    log(tmp.name)
-
-    # Upload to S3
+    # Generate files, upload to S3
+    temp_dir = tempfile.mkdtemp()
+    s3_suffix = '.part' + str(processed_seq_num) + '-' + str(process_seq_num)
     s3_client = boto3.client('s3')
-    s3_obj = str(processed_date) + "/part" + str(processed_seq_num) + "-" + str(process_seq_num)
-    s3_client.upload_file(tmp.name, processed_bucket, s3_obj)
-    log(s3_obj)
+    for key in counters:
+        s3_key = key + s3_suffix + '.csv'
+        filename = temp_dir + '/' + s3_key
+        # log('writing ' + filename)
+        write_csv(counters[key], TABLES[key]['csv_header'], filename)
+
+        s3_obj = str(processed_date) + '/' + s3_key
+        log('uploading ' + s3_obj)
+        s3_client.upload_file(filename, processed_bucket, s3_obj)
 
     # Completed the day
     if (not timed_out) and (latest_date != processed_date):
