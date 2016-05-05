@@ -225,14 +225,21 @@ def lambda_handler(event={}, context={}):
         process_seq_num = 0
 
     # Update latest_seq_num
-    metadata_table.put_item(
-        Item={
+    metadata_table.update_item(
+        Key={
             'role': 'processed',
-            'match_seq_num': process_seq_num,
-            'end_time': processed_end_time,
-            'date': str(processed_date),
-            's3bucket': processed_bucket
-        }
+        },
+        UpdateExpression='SET #ea1=:ea1, #ea2=:ea2, #ea3=:ea3',
+        ExpressionAttributeNames={
+            '#ea1': 'match_seq_num',
+            '#ea2': 'end_time',
+            '#ea3': 'date',
+        },
+        ExpressionAttributeValues={
+            ':ea1': process_seq_num,
+            ':ea2': processed_end_time,
+            ':ea3': str(processed_date),
+        },
     )
 
 if __name__ == '__main__':
