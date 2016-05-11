@@ -142,8 +142,8 @@ def merge_day(table, date, bucket_name, temp_dir):
     s3_client.upload_file(filename, bucket_name, final_obj)
 
     # Delete partial files
-    # for content in response['Contents']:
-    #     s3_client.delete_object(Bucket=bucket_name, Key=content['Key'])
+    for content in response['Contents']:
+        s3_client.delete_object(Bucket=bucket_name, Key=content['Key'])
 
 def get_day(table, date, bucket_name, temp_dir):
     date = str(date)
