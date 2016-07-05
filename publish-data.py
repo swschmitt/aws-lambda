@@ -258,6 +258,8 @@ def publish_data(start_date, end_date, processed_bucket, publish_bucket, endpoin
 
     s3_key = 'index.json'
     index['timestamp'] = int(time.time())
+    index['start_date'] = str(start_date)
+    index['end_date'] = str(end_date)
     filename = temp_dir + '/' + s3_key
     with open(filename, 'w') as fd:
         json.dump(index, fd)
