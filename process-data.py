@@ -100,7 +100,10 @@ def lambda_handler(event={}, context={}):
             break
 
         for match in response['Items']:
-            radiant_win = match["radiant_win"]
+            try:
+                radiant_win = (match["match_outcome"] == 2)
+            except:
+                radiant_win = match["radiant_win"]
             abilities_win = set()
             abilities_lose = set()
             invalid = False
