@@ -10,6 +10,7 @@ import collections
 import cPickle as pickle
 import tempfile
 import os
+import errno
 
 # This script has no timeout. Progress is incrementally saved in S3 such that
 # if it were to be killed, the next call will pick up almost where it left off.
